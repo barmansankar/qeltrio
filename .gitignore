@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Optional: override Next.js output directory (see next.config.ts)
+# NEXT_DIST_DIR=.next
+.tmp-sa.json
+
 # vercel
 .vercel
 

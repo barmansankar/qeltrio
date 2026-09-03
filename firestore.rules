@@ -1,0 +1,69 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function productStatsUnchanged() {
+      return request.resource.data.views == resource.data.views &&
+        request.resource.data.downloads == resource.data.downloads &&
+        request.resource.data.purchases == resource.data.purchases;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if false;
+      allow update: if isOwner(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+      allow delete: if false;
+    }
+
+    match /products/{productId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && productStatsUnchanged();
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if false;
+    }
+
+    match /downloads/{downloadId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow write: if false;
+    }
+
+    match /analytics_daily/{date} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /analytics_product_daily/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /product_ratings/{ratingId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /product_rating_summary/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

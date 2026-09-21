@@ -4,11 +4,19 @@ import {
   getProductRatingSummaries,
   getProductRatingSummary,
 } from "@/lib/ratings/server";
+import {
+  assertPublishable,
+  cleanupOrphanedUpload,
+  deleteProductR2File,
+  replaceProductR2File,
+  resolveR2MetadataForSave,
+} from "@/lib/products/r2-metadata";
 import { firestoreProductRepository } from "@/lib/products/repository";
-import { buildLicenseAgreement } from "@/lib/products/utils";
+import { buildLicenseAgreement, stripInternalProductFields } from "@/lib/products/utils";
 import type {
   ProductCreateInput,
   ProductListQuery,
+  ProductR2Metadata,
   ProductUpdateInput,
 } from "@/lib/products/types";
 import type {
@@ -41,6 +49,13 @@ async function enrichWithRatings(
   );
 }
 
+function stripUploadToken<T extends ProductCreateInput | ProductUpdateInput>(
+  input: T
+): Omit<T, "r2UploadToken"> {
+  const { r2UploadToken: _token, ...rest } = input;
+  return rest;
+}
+
 export class ProductService {
   constructor(
     private readonly repository = firestoreProductRepository
@@ -55,7 +70,7 @@ export class ProductService {
     });
     return {
       ...result,
-      items: await enrichWithRatings(result.items),
+      items: (await enrichWithRatings(result.items)).map(stripInternalProductFields),
     };
   }
 
@@ -77,7 +92,7 @@ export class ProductService {
     const withRatings = withRatingSummary(product, summary);
 
     return {
-      ...withRatings,
+      ...stripInternalProductFields(withRatings),
       licenseAgreement: buildLicenseAgreement(product.name),
     };
   }
@@ -102,21 +117,122 @@ export class ProductService {
     if (await this.repository.slugExists(input.slug)) {
       throw new Error("SLUG_EXISTS");
     }
-    return this.repository.create(input);
+
+    const existing = null;
+    let r2Metadata: ProductR2Metadata & { previousObjectKey?: string };
+
+    try {
+      r2Metadata = await resolveR2MetadataForSave({
+        slug: input.slug,
+        status: input.status,
+        r2UploadToken: input.r2UploadToken,
+        existingProduct: existing,
+      });
+    } catch (error) {
+      throw error;
+    }
+
+    const productInput = stripUploadToken(input);
+
+    if (productInput.status === "published") {
+      assertPublishable({
+        id: "",
+        ...productInput,
+        ...r2Metadata,
+        views: 0,
+        downloads: 0,
+        purchases: 0,
+        searchKeywords: [],
+        createdAt: "",
+        updatedAt: "",
+      } as Product);
+    }
+
+    const { previousObjectKey: _prev, ...r2Fields } = r2Metadata;
+
+    try {
+      const product = await this.repository.create(productInput, r2Fields);
+      return product;
+    } catch (error) {
+      if (r2Fields.r2ObjectKey && input.r2UploadToken) {
+        await cleanupOrphanedUpload(r2Fields.r2ObjectKey);
+      }
+      throw error;
+    }
   }
 
   async update(id: string, input: ProductUpdateInput): Promise<Product> {
     if (input.slug && (await this.repository.slugExists(input.slug, id))) {
       throw new Error("SLUG_EXISTS");
     }
-    return this.repository.update(id, input);
+
+    const existing = await this.repository.getById(id);
+    if (!existing) {
+      throw new Error("PRODUCT_NOT_FOUND");
+    }
+
+    const slug = input.slug ?? existing.slug;
+    const status = input.status ?? existing.status;
+
+    let r2Metadata: ProductR2Metadata & { previousObjectKey?: string };
+
+    try {
+      r2Metadata = await resolveR2MetadataForSave({
+        slug,
+        status,
+        r2UploadToken: input.r2UploadToken,
+        existingProduct: existing,
+      });
+    } catch (error) {
+      throw error;
+    }
+
+    const productInput = stripUploadToken(input);
+    const mergedForValidation = { ...existing, ...productInput, ...r2Metadata };
+
+    if (mergedForValidation.status === "published") {
+      assertPublishable(mergedForValidation);
+    }
+
+    const previousObjectKey = r2Metadata.previousObjectKey;
+    const newObjectKey = input.r2UploadToken ? r2Metadata.r2ObjectKey : undefined;
+    const { previousObjectKey: _prev, ...r2Fields } = r2Metadata;
+
+    try {
+      const product = await this.repository.update(id, productInput, r2Fields);
+
+      if (previousObjectKey && newObjectKey) {
+        await replaceProductR2File(previousObjectKey);
+      }
+
+      return product;
+    } catch (error) {
+      if (newObjectKey && input.r2UploadToken) {
+        await cleanupOrphanedUpload(newObjectKey, {
+          protectObjectKeys: [existing.r2ObjectKey ?? ""],
+        });
+      }
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
-    return this.repository.delete(id);
+    const product = await this.repository.getById(id);
+    if (!product) {
+      throw new Error("PRODUCT_NOT_FOUND");
+    }
+
+    await this.repository.delete(id);
+    await deleteProductR2File(product);
   }
 
   async publish(id: string): Promise<Product> {
+    const existing = await this.repository.getById(id);
+    if (!existing) {
+      throw new Error("PRODUCT_NOT_FOUND");
+    }
+
+    assertPublishable(existing);
     return this.repository.publish(id);
   }
 

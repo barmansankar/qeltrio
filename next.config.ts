@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* Presigned uploads go direct to R2; no large proxy body required. */
 };
 
 export default nextConfig;

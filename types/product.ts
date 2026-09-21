@@ -1,5 +1,7 @@
 import type { ProductStatus } from "@/types";
 
+export type R2UploadStatus = "none" | "uploading" | "uploaded" | "failed";
+
 /**
  * Core product catalog entity stored in Firestore (`products` collection).
  * Ratings are stored separately in `product_rating_summary`.
@@ -28,6 +30,11 @@ export interface Product {
   purchases: number;
   /** Cloudflare R2 object key (Phase 7). Never store public download URLs. */
   r2ObjectKey?: string;
+  r2FileName?: string;
+  r2FileSize?: number;
+  r2ContentType?: string;
+  r2UploadedAt?: string;
+  r2UploadStatus?: R2UploadStatus;
   /** Future Lemon Squeezy integration (Phase 6). */
   lemonSqueezyVariantId?: string;
   /** Lowercase tokens for basic Firestore-friendly search filtering. */

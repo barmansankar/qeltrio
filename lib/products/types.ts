@@ -34,8 +34,18 @@ export interface ProductFormInput {
   documentationUrl?: string;
   status: ProductStatus;
   featured: boolean;
-  r2ObjectKey?: string;
+  /** Signed upload token from /api/admin/products/upload — not stored in Firestore */
+  r2UploadToken?: string;
   lemonSqueezyVariantId?: string;
+}
+
+export interface ProductR2Metadata {
+  r2ObjectKey?: string;
+  r2FileName?: string;
+  r2FileSize?: number;
+  r2ContentType?: string;
+  r2UploadedAt?: string;
+  r2UploadStatus?: import("@/types/product").R2UploadStatus;
 }
 
 export type ProductCreateInput = ProductFormInput;
@@ -46,8 +56,12 @@ export interface ProductRepository {
   getById(id: string): Promise<Product | null>;
   getBySlug(slug: string, options?: { includeUnpublished?: boolean }): Promise<Product | null>;
   slugExists(slug: string, excludeId?: string): Promise<boolean>;
-  create(input: ProductCreateInput): Promise<Product>;
-  update(id: string, input: ProductUpdateInput): Promise<Product>;
+  create(input: ProductCreateInput, r2Metadata?: ProductR2Metadata): Promise<Product>;
+  update(
+    id: string,
+    input: ProductUpdateInput,
+    r2Metadata?: ProductR2Metadata
+  ): Promise<Product>;
   delete(id: string): Promise<void>;
   publish(id: string): Promise<Product>;
   archive(id: string): Promise<Product>;

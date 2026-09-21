@@ -14,6 +14,7 @@ import type {
   ProductCreateInput,
   ProductListQuery,
   ProductRepository,
+  ProductR2Metadata,
   ProductUpdateInput,
 } from "@/lib/products/types";
 import { PRODUCTS_COLLECTION } from "@/lib/products/types";
@@ -225,7 +226,10 @@ export class FirestoreProductRepository implements ProductRepository {
     return true;
   }
 
-  async create(input: ProductCreateInput): Promise<Product> {
+  async create(
+    input: ProductCreateInput,
+    r2Metadata?: ProductR2Metadata
+  ): Promise<Product> {
     const db = getAdminFirestore();
     const slug = input.slug || slugifyProductName(input.name);
     const now = Timestamp.now();
@@ -252,7 +256,12 @@ export class FirestoreProductRepository implements ProductRepository {
       views: 0,
       downloads: 0,
       purchases: 0,
-      r2ObjectKey: input.r2ObjectKey || undefined,
+      r2ObjectKey: r2Metadata?.r2ObjectKey || undefined,
+      r2FileName: r2Metadata?.r2FileName || undefined,
+      r2FileSize: r2Metadata?.r2FileSize || undefined,
+      r2ContentType: r2Metadata?.r2ContentType || undefined,
+      r2UploadedAt: r2Metadata?.r2UploadedAt || undefined,
+      r2UploadStatus: r2Metadata?.r2UploadStatus ?? "none",
       lemonSqueezyVariantId: input.lemonSqueezyVariantId || undefined,
       searchKeywords: buildSearchKeywords(input),
       createdAt: now.toDate().toISOString(),
@@ -268,7 +277,11 @@ export class FirestoreProductRepository implements ProductRepository {
     return { id: ref.id, ...product };
   }
 
-  async update(id: string, input: ProductUpdateInput): Promise<Product> {
+  async update(
+    id: string,
+    input: ProductUpdateInput,
+    r2Metadata?: ProductR2Metadata
+  ): Promise<Product> {
     const existing = await this.getById(id);
     if (!existing) {
       throw new Error("PRODUCT_NOT_FOUND");
@@ -279,6 +292,7 @@ export class FirestoreProductRepository implements ProductRepository {
     const merged = {
       ...existing,
       ...input,
+      ...(r2Metadata ?? {}),
       featured:
         input.featured !== undefined
           ? input.featured && (input.status ?? existing.status) === "published"

@@ -93,6 +93,32 @@ function asRequirements(value: unknown): string {
   return String(value ?? "");
 }
 
+type InternalProductFields =
+  | "r2ObjectKey"
+  | "r2FileName"
+  | "r2FileSize"
+  | "r2ContentType"
+  | "r2UploadedAt"
+  | "r2UploadStatus"
+  | "lemonSqueezyVariantId";
+
+/** Removes server-only storage metadata from public catalog responses. */
+export function stripInternalProductFields<T extends Product>(
+  product: T
+): Omit<T, InternalProductFields> {
+  const {
+    r2ObjectKey: _r2k,
+    r2FileName: _r2n,
+    r2FileSize: _r2s,
+    r2ContentType: _r2c,
+    r2UploadedAt: _r2u,
+    r2UploadStatus: _r2st,
+    lemonSqueezyVariantId: _ls,
+    ...publicProduct
+  } = product;
+  return publicProduct;
+}
+
 export function buildSearchKeywords(input: {
   name: string;
   slug: string;
@@ -163,6 +189,24 @@ export function productFromFirestore(
       : data.downloadObjectKey
         ? String(data.downloadObjectKey)
         : undefined,
+    r2FileName: data.r2FileName ? String(data.r2FileName) : undefined,
+    r2FileSize:
+      data.r2FileSize !== undefined && data.r2FileSize !== null
+        ? asNumber(data.r2FileSize)
+        : undefined,
+    r2ContentType: data.r2ContentType ? String(data.r2ContentType) : undefined,
+    r2UploadedAt: data.r2UploadedAt
+      ? parseTimestamp(data.r2UploadedAt)
+      : undefined,
+    r2UploadStatus:
+      data.r2UploadStatus === "none" ||
+      data.r2UploadStatus === "uploading" ||
+      data.r2UploadStatus === "uploaded" ||
+      data.r2UploadStatus === "failed"
+        ? data.r2UploadStatus
+        : data.r2ObjectKey || data.downloadObjectKey
+          ? "uploaded"
+          : "none",
     lemonSqueezyVariantId: data.lemonSqueezyVariantId
       ? String(data.lemonSqueezyVariantId)
       : undefined,
@@ -199,6 +243,11 @@ export function productToFirestore(
     downloads: product.downloads,
     purchases: product.purchases,
     r2ObjectKey: product.r2ObjectKey ?? null,
+    r2FileName: product.r2FileName ?? null,
+    r2FileSize: product.r2FileSize ?? null,
+    r2ContentType: product.r2ContentType ?? null,
+    r2UploadedAt: product.r2UploadedAt ?? null,
+    r2UploadStatus: product.r2UploadStatus ?? "none",
     lemonSqueezyVariantId: product.lemonSqueezyVariantId ?? null,
     searchKeywords: product.searchKeywords,
   };

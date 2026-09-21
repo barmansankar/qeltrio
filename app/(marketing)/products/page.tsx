@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { ProductGrid } from "@/components/products/product-grid";
 import { ProductsCatalog } from "@/components/products/products-catalog";
-import { ProductsSearchBar } from "@/components/products/products-search-bar";
-import { ProductCardSkeleton, Skeleton } from "@/components/ui/skeleton";
+import { ProductsPageControls } from "@/components/products/products-page-controls";
+import { ProductCardSkeleton } from "@/components/ui/skeleton";
 import { PRODUCTS_PAGE_SIZE } from "@/constants/products";
 import type { ProductSortOption } from "@/constants/products";
 import { getFeaturedProducts, getProducts } from "@/lib/products/server";
@@ -38,22 +38,16 @@ function FeaturedSkeleton() {
   );
 }
 
-function SearchBarSkeleton() {
-  return <Skeleton className="h-10 w-full sm:max-w-md" />;
-}
-
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string }>;
+  searchParams: Promise<{ category?: string; sort?: string }>;
 }) {
   const params = await searchParams;
-  const q = params.q ?? "";
   const category = params.category ?? "";
   const sort = (params.sort as ProductSortOption) ?? "newest";
 
   const initialCatalog = await getProducts({
-    search: q.trim() || undefined,
     category: category || undefined,
     sort,
     limit: PRODUCTS_PAGE_SIZE,
@@ -62,26 +56,22 @@ export default async function ProductsPage({
   return (
     <div className="page-container py-6 sm:py-8">
       <header className="mb-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <h1 className="page-title shrink-0">Products</h1>
-          <div className="w-full sm:max-w-md sm:shrink-0">
-            <Suspense fallback={<SearchBarSkeleton />}>
-              <ProductsSearchBar />
-            </Suspense>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="shrink-0">
+            <h1 className="page-title">Products</h1>
+            <p className="page-description mt-2">
+              Discover SaaS applications, templates, AI tools, and more.
+            </p>
+          </div>
+          <div className="w-full sm:max-w-2xl sm:shrink-0 lg:max-w-3xl">
+            <ProductsPageControls />
           </div>
         </div>
-        <p className="page-description mt-2">
-          {q.trim()
-            ? `Showing results for "${q.trim()}"`
-            : "Discover SaaS applications, templates, AI tools, and more."}
-        </p>
       </header>
 
-      {!q.trim() && (
-        <Suspense fallback={<FeaturedSkeleton />}>
-          <FeaturedProducts />
-        </Suspense>
-      )}
+      <Suspense fallback={<FeaturedSkeleton />}>
+        <FeaturedProducts />
+      </Suspense>
 
       <ProductsCatalog
         initialData={{
@@ -89,7 +79,7 @@ export default async function ProductsPage({
           nextCursor: initialCatalog.nextCursor,
           hasMore: initialCatalog.hasMore,
         }}
-        initialQuery={{ q, category, sort }}
+        initialQuery={{ category, sort }}
       />
     </div>
   );

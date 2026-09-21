@@ -17,7 +17,36 @@ function mapApiError(error: unknown) {
         { status: 409 }
       );
     }
-    if (error.message === "UNAUTHENTICATED" || error.message === "FORBIDDEN") {
+    if (error.message === "ZIP_REQUIRED_FOR_PUBLISH") {
+      return NextResponse.json(
+        {
+          error: "A software ZIP file is required before publishing this product.",
+          fieldErrors: { r2UploadToken: "A software ZIP file is required before publishing this product." },
+        },
+        { status: 400 }
+      );
+    }
+    if (error.message === "R2_NOT_CONFIGURED") {
+      return NextResponse.json(
+        { error: "Cloudflare R2 is not configured." },
+        { status: 503 }
+      );
+    }
+    if (
+      error.message === "INVALID_UPLOAD_TOKEN" ||
+      error.message === "UPLOAD_NOT_FOUND" ||
+      error.message === "UPLOAD_SLUG_MISMATCH" ||
+      error.message === "UPLOAD_PRODUCT_MISMATCH"
+    ) {
+      return NextResponse.json(
+        { error: "Invalid or expired upload. Please upload the file again." },
+        { status: 400 }
+      );
+    }
+    if (error.message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+    if (error.message === "FORBIDDEN") {
       return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
     }
   }

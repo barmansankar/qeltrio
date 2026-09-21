@@ -55,7 +55,7 @@ export function Navbar() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <ProductSearchTrigger className="hidden sm:inline-flex" />
 
           <div className="hidden sm:block">

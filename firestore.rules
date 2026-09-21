@@ -21,6 +21,15 @@ service cloud.firestore {
         request.resource.data.purchases == resource.data.purchases;
     }
 
+    function r2FieldsUnchanged() {
+      return request.resource.data.r2ObjectKey == resource.data.r2ObjectKey &&
+        request.resource.data.r2FileName == resource.data.r2FileName &&
+        request.resource.data.r2FileSize == resource.data.r2FileSize &&
+        request.resource.data.r2ContentType == resource.data.r2ContentType &&
+        request.resource.data.r2UploadedAt == resource.data.r2UploadedAt &&
+        request.resource.data.r2UploadStatus == resource.data.r2UploadStatus;
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if false;
@@ -32,7 +41,7 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if resource.data.status == 'published' || isAdmin();
       allow create: if isAdmin();
-      allow update: if isAdmin() && productStatsUnchanged();
+      allow update: if isAdmin() && productStatsUnchanged() && r2FieldsUnchanged();
       allow delete: if isAdmin();
     }
 

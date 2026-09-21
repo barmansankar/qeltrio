@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { PRODUCT_CATEGORIES } from "@/constants/product-categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  ProductFileUpload,
+  type UploadedFileState,
+} from "@/components/products/product-file-upload";
+import { REQUIRE_ZIP_FOR_PUBLISH } from "@/lib/products/validation";
 import { slugifyProductName } from "@/lib/products/utils";
 import type { Product } from "@/types/product";
 import type { ProductFormValues } from "@/lib/products/validation";
@@ -43,7 +48,7 @@ const defaultValues: ProductFormValues = {
   documentationUrl: "",
   status: "draft",
   featured: false,
-  r2ObjectKey: "",
+  r2UploadToken: "",
   lemonSqueezyVariantId: "",
 };
 
@@ -52,6 +57,9 @@ export function ProductForm({ mode, initialProduct }: ProductFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const [uploadedFile, setUploadedFile] = useState<UploadedFileState | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [form, setForm] = useState<ProductFormValues>(() => {
     if (!initialProduct) return defaultValues;
@@ -73,7 +81,7 @@ export function ProductForm({ mode, initialProduct }: ProductFormProps) {
       documentationUrl: initialProduct.documentationUrl ?? "",
       status: initialProduct.status,
       featured: initialProduct.featured,
-      r2ObjectKey: initialProduct.r2ObjectKey ?? "",
+      r2UploadToken: "",
       lemonSqueezyVariantId: initialProduct.lemonSqueezyVariantId ?? "",
     };
   });
@@ -96,13 +104,28 @@ export function ProductForm({ mode, initialProduct }: ProductFormProps) {
     setSubmitting(true);
     setError(null);
     setFieldErrors({});
+    setUploadError(null);
+
+    const productSlug = form.slug || slugifyProductName(form.name);
+
+    if (
+      form.status === "published" &&
+      REQUIRE_ZIP_FOR_PUBLISH &&
+      !uploadedFile &&
+      !(initialProduct?.r2UploadStatus === "uploaded" && initialProduct.r2ObjectKey)
+    ) {
+      setUploadError("A software ZIP file is required before publishing this product.");
+      setSubmitting(false);
+      return;
+    }
 
     const payload = {
       ...form,
-      slug: form.slug || slugifyProductName(form.name),
+      slug: productSlug,
       technologies: textareaToList(technologiesText),
       features: textareaToList(featuresText),
       screenshots: textareaToList(screenshotsText),
+      r2UploadToken: uploadedFile?.uploadToken || undefined,
     };
 
     const url =
@@ -312,6 +335,25 @@ export function ProductForm({ mode, initialProduct }: ProductFormProps) {
       </section>
 
       <section className="surface-card space-y-4 p-5 sm:p-6">
+        <h2 className="text-subheading">Software file</h2>
+        <p className="text-caption">
+          Upload the downloadable ZIP for this product. Files are stored privately in Cloudflare R2.
+          {REQUIRE_ZIP_FOR_PUBLISH
+            ? " A ZIP is required before publishing."
+            : " Optional for drafts."}
+        </p>
+        <ProductFileUpload
+          slug={slugPreview}
+          productId={initialProduct?.id}
+          existingFile={initialProduct}
+          value={uploadedFile}
+          onChange={setUploadedFile}
+          disabled={submitting}
+          error={uploadError ?? fieldErrors.r2UploadToken}
+        />
+      </section>
+
+      <section className="surface-card space-y-4 p-5 sm:p-6">
         <h2 className="text-subheading">Marketplace settings</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Status" error={fieldErrors.status}>
@@ -342,17 +384,6 @@ export function ProductForm({ mode, initialProduct }: ProductFormProps) {
             Featured product
           </label>
         </div>
-        <Field
-          label="R2 Object Key"
-          error={fieldErrors.r2ObjectKey}
-          hint="Future download storage path (optional)"
-        >
-          <Input
-            value={form.r2ObjectKey ?? ""}
-            onChange={(e) => setForm((c) => ({ ...c, r2ObjectKey: e.target.value }))}
-            placeholder="products/my-product/v1.0.0/product.zip"
-          />
-        </Field>
       </section>
 
       <div className="flex flex-wrap gap-3">

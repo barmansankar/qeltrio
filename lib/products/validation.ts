@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PRODUCT_CATEGORIES } from "@/constants/product-categories";
+import { REQUIRE_ZIP_FOR_PUBLISH } from "@/constants/product-files";
 
 const optionalUrl = z
   .string()
@@ -36,7 +37,7 @@ export const productFormSchema = z.object({
   documentationUrl: optionalUrl,
   status: z.enum(["draft", "published", "archived"]),
   featured: z.boolean().default(false),
-  r2ObjectKey: z.string().trim().max(500).optional().or(z.literal("")),
+  r2UploadToken: z.string().trim().min(1).optional().or(z.literal("")),
   lemonSqueezyVariantId: z.string().trim().max(120).optional().or(z.literal("")),
 });
 
@@ -56,3 +57,5 @@ export function formatZodErrors(error: z.ZodError): Record<string, string> {
   }
   return fieldErrors;
 }
+
+export { REQUIRE_ZIP_FOR_PUBLISH };

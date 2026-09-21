@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ProductGrid } from "@/components/products/product-grid";
-import { ProductFilters } from "@/components/products/product-filters";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProductCardSkeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ interface CatalogResponse {
 }
 
 interface CatalogQuery {
-  q: string;
   category: string;
   sort: ProductSortOption;
 }
@@ -30,22 +28,20 @@ interface ProductsCatalogProps {
 }
 
 function buildQueryKey(query: CatalogQuery) {
-  return `${query.q}|${query.category}|${query.sort}`;
+  return `${query.category}|${query.sort}`;
 }
 
 export function ProductsCatalog({
   initialData,
   initialQuery,
 }: ProductsCatalogProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const initialQueryKey = useRef(buildQueryKey(initialQuery));
 
-  const q = searchParams.get("q") ?? "";
   const category = searchParams.get("category") ?? "";
   const sort = (searchParams.get("sort") as ProductSortOption) ?? "newest";
-  const queryKey = buildQueryKey({ q, category, sort });
+  const queryKey = buildQueryKey({ category, sort });
 
   const [products, setProducts] = useState(initialData.products);
   const [nextCursor, setNextCursor] = useState(initialData.nextCursor);
@@ -56,7 +52,6 @@ export function ProductsCatalog({
   const fetchProducts = useCallback(
     async (cursor?: string, append = false) => {
       const params = new URLSearchParams();
-      if (q) params.set("q", q);
       if (category) params.set("category", category);
       if (sort) params.set("sort", sort);
       params.set("limit", String(PRODUCTS_PAGE_SIZE));
@@ -74,7 +69,7 @@ export function ProductsCatalog({
       setNextCursor(data.nextCursor);
       setHasMore(data.hasMore);
     },
-    [q, category, sort]
+    [category, sort]
   );
 
   useEffect(() => {
@@ -91,27 +86,12 @@ export function ProductsCatalog({
     });
   }, [fetchProducts, queryKey]);
 
-  function updateParam(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    router.replace(`/products?${params.toString()}`, { scroll: false });
-  }
-
   if (loading && products.length === 0) {
     return (
-      <div className="space-y-6">
-        <ProductFilters
-          category={category}
-          sort={sort}
-          onCategoryChange={(value) => updateParam("category", value)}
-          onSortChange={(value) => updateParam("sort", value)}
-        />
-        <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
-          {Array.from({ length: PRODUCTS_PAGE_SIZE }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+        {Array.from({ length: PRODUCTS_PAGE_SIZE }).map((_, i) => (
+          <ProductCardSkeleton key={i} />
+        ))}
       </div>
     );
   }
@@ -137,23 +117,14 @@ export function ProductsCatalog({
 
   return (
     <div className="space-y-6">
-      <ProductFilters
-        category={category}
-        sort={sort}
-        onCategoryChange={(value) => updateParam("category", value)}
-        onSortChange={(value) => updateParam("sort", value)}
-      />
-
       {products.length === 0 ? (
         <EmptyState
           icon={Package}
           title="No products found"
           description={
-            q.trim()
-              ? `No products match your search for "${q.trim()}".`
-              : category
-                ? `No products in the ${category} category yet.`
-                : "No products are available right now."
+            category
+              ? `No products in the ${category} category yet.`
+              : "No products are available right now."
           }
           action={{ label: "Clear filters", href: "/products" }}
         />

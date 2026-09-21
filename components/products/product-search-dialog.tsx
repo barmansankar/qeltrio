@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Package, Search, X } from "lucide-react";
+import { Package, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ProductSearchResultItem } from "@/lib/products/types";
 
@@ -99,12 +99,6 @@ export function ProductSearchDialog({ open, onClose }: ProductSearchDialogProps)
         if (selected) {
           router.push(`/products/${selected.slug}`);
           onClose();
-          return;
-        }
-
-        if (query.trim()) {
-          router.push(`/products?q=${encodeURIComponent(query.trim())}`);
-          onClose();
         }
       }
     }
@@ -114,8 +108,6 @@ export function ProductSearchDialog({ open, onClose }: ProductSearchDialogProps)
   }, [open, results, activeIndex, query, router, onClose]);
 
   if (!open) return null;
-
-  const showViewAll = query.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh] sm:pt-[15vh]">
@@ -198,22 +190,6 @@ export function ProductSearchDialog({ open, onClose }: ProductSearchDialogProps)
             </ul>
           )}
         </div>
-
-        {showViewAll && (
-          <div className="border-t border-[var(--border)] p-2">
-            <button
-              type="button"
-              onClick={() => {
-                router.push(`/products?q=${encodeURIComponent(query.trim())}`);
-                onClose();
-              }}
-              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 focus-ring"
-            >
-              View all results for &ldquo;{query.trim()}&rdquo;
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-        )}
 
         <div className="hidden border-t border-[var(--border)] px-4 py-2 text-[11px] text-zinc-600 sm:flex sm:items-center sm:gap-4">
           <span>

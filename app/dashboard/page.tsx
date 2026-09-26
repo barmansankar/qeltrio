@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { Suspense } from "react";
 import { ArrowUpRight, BarChart3, Package, TrendingUp } from "lucide-react";
 import Link from "next/link";

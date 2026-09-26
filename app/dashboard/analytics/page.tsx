@@ -1,10 +1,11 @@
-import dynamic from "next/dynamic";
+export const dynamic = "force-dynamic";
+import dynamicImport from "next/dynamic";
 import { Suspense } from "react";
 import { DashboardPage } from "@/components/layout/dashboard-page";
 import { DashboardOverviewSkeleton } from "@/components/ui/skeleton";
 import { getDashboardAnalytics } from "@/lib/analytics";
 
-const AnalyticsDashboard = dynamic(
+const AnalyticsDashboard = dynamicImport(
   () =>
     import("@/components/analytics/analytics-dashboard").then(
       (module) => module.AnalyticsDashboard

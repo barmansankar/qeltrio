@@ -57,10 +57,10 @@ async function getDailyDoc(date: string): Promise<DailyAnalyticsDoc> {
 
 async function sumDailyMetrics(start: Date, end: Date) {
   const keys = getAllDateKeysBetween(start, end);
-  let totals = { views: 0, downloads: 0, signups: 0, purchases: 0 };
+  const dailyDocs = await Promise.all(keys.map((date) => getDailyDoc(date)));
 
-  for (const date of keys) {
-    const daily = await getDailyDoc(date);
+  let totals = { views: 0, downloads: 0, signups: 0, purchases: 0 };
+  for (const daily of dailyDocs) {
     totals.views += daily.pageViews + daily.productViews;
     totals.downloads += daily.downloads;
     totals.signups += daily.signups;
@@ -111,24 +111,30 @@ async function getProductPerformance(
     });
   }
 
-  for (const product of catalog) {
-    for (const date of keys) {
-      const docId = `${product.id}_${date}`;
-      const snapshot = await db
-        .collection(PRODUCT_DAILY_COLLECTION)
-        .doc(docId)
-        .get();
+  const docRefs = catalog.flatMap((product) =>
+    keys.map((date) => ({
+      productId: product.id,
+      ref: db.collection(PRODUCT_DAILY_COLLECTION).doc(`${product.id}_${date}`),
+    }))
+  );
 
-      if (!snapshot.exists) continue;
+  const FIRESTORE_GET_ALL_LIMIT = 10;
+  for (let i = 0; i < docRefs.length; i += FIRESTORE_GET_ALL_LIMIT) {
+    const chunk = docRefs.slice(i, i + FIRESTORE_GET_ALL_LIMIT);
+    const snapshots = await db.getAll(...chunk.map((item) => item.ref));
+
+    snapshots.forEach((snapshot, index) => {
+      if (!snapshot.exists) return;
+
+      const { productId } = chunk[index];
+      const entry = productMap.get(productId);
+      if (!entry) return;
 
       const data = snapshot.data()!;
-      const entry = productMap.get(product.id);
-      if (!entry) continue;
-
       entry.views += Number(data.views ?? 0);
       entry.downloads += Number(data.downloads ?? 0);
       entry.purchases += Number(data.purchases ?? 0);
-    }
+    });
   }
 
   return Array.from(productMap.values())
@@ -144,15 +150,18 @@ async function buildViewsDownloadsSeries(
   const keys = getDateKeysInRange(start, end, range);
   const series: TimeSeriesPoint[] = [];
 
-  for (const { date, label } of keys) {
-    const daily = await getDailyDoc(date);
-    series.push({
-      date,
-      label,
-      views: daily.pageViews + daily.productViews,
-      downloads: daily.downloads,
-    });
-  }
+  const dailyByDate = await Promise.all(
+    keys.map(async ({ date, label }) => {
+      const daily = await getDailyDoc(date);
+      return {
+        date,
+        label,
+        views: daily.pageViews + daily.productViews,
+        downloads: daily.downloads,
+      };
+    })
+  );
+  series.push(...dailyByDate);
 
   return series;
 }
@@ -165,14 +174,13 @@ async function buildUserGrowthSeries(
   const keys = getDateKeysInRange(start, end, range);
   const series: UserGrowthPoint[] = [];
 
-  for (const { date, label } of keys) {
-    const daily = await getDailyDoc(date);
-    series.push({
-      date,
-      label,
-      users: daily.signups,
-    });
-  }
+  const points = await Promise.all(
+    keys.map(async ({ date, label }) => {
+      const daily = await getDailyDoc(date);
+      return { date, label, users: daily.signups };
+    })
+  );
+  series.push(...points);
 
   return series;
 }

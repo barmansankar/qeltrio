@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { DashboardLayoutClient } from "@/components/layout/dashboard-shell";
 import { getAuthenticatedUser } from "@/lib/auth/server";
 
+/** Admin dashboard uses cookies + Firestore; never prerender at build time. */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Dashboard | Qeltrio",
   description: "Manage your Qeltrio marketplace",

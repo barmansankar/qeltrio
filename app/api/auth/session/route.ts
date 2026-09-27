@@ -7,6 +7,9 @@ import {
   getSessionCookieOptions,
 } from "@/lib/auth/server";
 
+/** Firebase Admin + jwks-rsa/jose require Node (not Edge). */
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -36,7 +39,8 @@ export async function POST(request: Request) {
     response.cookies.set(getSessionCookieOptions(sessionCookie));
 
     return response;
-  } catch {
+  } catch (error) {
+    console.error("[api/auth/session]", error);
     return NextResponse.json(
       { error: "Unable to sign in. Please try again." },
       { status: 401 }
